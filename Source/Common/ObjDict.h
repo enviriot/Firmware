@@ -20,10 +20,9 @@ extern "C" {
 // Predefined variables
 enum
 {
-/*
     // Global Settings
     objNodeName         = (uint16_t)0xFF00, // _sName<String>
-
+/*
     objGateID           = (uint16_t)0xFF04, // cfg/XD_GateId
 
     // PHY Settings

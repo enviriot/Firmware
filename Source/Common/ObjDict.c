@@ -15,6 +15,7 @@ See LICENSE file for license details.
 
 #include "hal.h"
 #include "mqTypes.h"
+#include "eep.h"
 #include "ObjDict.h"
 
 
@@ -80,9 +81,12 @@ static uint8_t mqttsn_build_node_name(uint8_t * pBuf)
 }
 */
 
+static uint8_t cbReadNodeName(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
+static uint8_t cbWriteNodeName(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
+
 
 static const indextable_t ListPOD[] = {
-    {{0, 0, 0}, NULL, NULL, 0},
+    {{0, 0, 0}, cbReadNodeName, cbWriteNodeName, objNodeName},
 };
 static uint8_t      ListPODflag[sizeof(ListPOD)/sizeof(indextable_t)];
 
@@ -94,16 +98,35 @@ static uint8_t      ListODflag[OD_MAX_INDEX_LIST];
 //////////////////////////
 // Callback functions
 
-static uint8_t cbWriteNodeName(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf)
+static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
+{
+    uint8_t Len = eepReadArray(eepNodeName, pBuf);
+    if(Len > 0)
+    {
+        *pLen = Len;
+        return MQTTSN_RET_ACCEPTED;
+    }
+    
+    // ToDo Default Name
+    
+    pBuf[0] = 'A';
+    pBuf[1] = 'B';
+    pBuf[2] = 'C';
+    *pLen = 3;
+
+    return MQTTSN_RET_ACCEPTED;
+}
+
+static uint8_t cbWriteNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf)
 {
     if(Len > MQTTSN_SIZEOF_CLIENTID)
     {
         return MQTTSN_RET_REJ_NOT_SUPP;
     }
-    return eepromWriteOD(pSubidx, Len, pBuf);
+
+    eepWriteArray(eepNodeName, Len, pBuf);
+    return MQTTSN_RET_ACCEPTED;
 }
-
-
 
 // Search Object by Index
 static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
