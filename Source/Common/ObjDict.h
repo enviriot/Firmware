@@ -71,16 +71,17 @@ typedef struct
 
 void OD_Init(void);
 
+e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf);
+e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf);
+
+/*
 uint8_t OD_MakeTopicName(uint8_t RecNR, uint8_t *pBuf);
 e_MQTTSN_RETURNS_t OD_Register(MQTTSN_MESSAGE_t *pMsg);
 void OD_RegAck(uint16_t index);
 
-e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf);
-e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf);
-
 e_MQTTSN_RETURNS_t OD_ReadPack(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf);
 e_MQTTSN_RETURNS_t OD_WritePack(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf);
-
+*/
 
 #ifdef __cplusplus
 }

@@ -307,6 +307,7 @@ void mqttsn_parser_phyM(MQ_t * pPHY1outBuf)
         case MQTTSN_MSGTYP_WILLMSGREQ:
         case MQTTSN_MSGTYP_WILLMSG:
 */
+/*
         // Register Topic request
         case MQTTSN_MSGTYP_REGISTER:
         {
@@ -465,6 +466,7 @@ void mqttsn_parser_phyM(MQ_t * pPHY1outBuf)
 #endif  //  MQTTSN_USE_MESH
             break;
         }
+*/
 /*
         case MQTTSN_MSGTYP_PUBCOMP:
         case MQTTSN_MSGTYP_PUBREC:
@@ -1569,7 +1571,7 @@ bool MQTTSN_CanSend(void)
 {
     return (vMQ_MsgType == MQTTSN_MSGTYP_PINGREQ);
 }
-
+/*
 void MQTTSN_Send(e_MQTTSN_MSGTYPE_t      MsgType,
                  uint8_t                 Flags,
                  uint16_t                TopicId)
@@ -1633,3 +1635,4 @@ void MQTTSN_Send(e_MQTTSN_MSGTYPE_t      MsgType,
         vMQ_nRetry = MQTTSN_N_RETRIES;
     }
 }
+*/

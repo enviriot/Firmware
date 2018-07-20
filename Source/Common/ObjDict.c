@@ -19,18 +19,40 @@ See LICENSE file for license details.
 #include "ObjDict.h"
 
 
+static uint8_t cbReadNodeName(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
+static uint8_t cbWriteNodeName(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
+
+
+static const indextable_t ListPOD[] = {
+    {{0, 0, 0}, cbReadNodeName, cbWriteNodeName, objNodeName},
+};
+static uint8_t      ListPODflag[sizeof(ListPOD)/sizeof(indextable_t)];
+
+
+static indextable_t ListOD[OD_MAX_INDEX_LIST];
+static uint8_t      ListODflag[OD_MAX_INDEX_LIST];
+
+
+//////////////////////////
+// Callback functions
+
+static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
+{
+    uint8_t Len = eepReadArray(eepNodeName, pBuf);
+    if(Len > 0)
+    {
+        *pLen = Len;
+        return MQTTSN_RET_ACCEPTED;
+    }
+    
+    // ToDo Default Name
+    
+    pBuf[0] = 'A';
+    pBuf[1] = 'B';
+    pBuf[2] = 'C';
+    *pLen = 3;
 
 /*
-// Build Name
-static uint8_t mqttsn_build_node_name(uint8_t * pBuf)
-{
-    uint8_t Length = MQTTSN_SIZEOF_CLIENTID;
-    OD_Read(objNodeName, MQTTSN_FL_TOPICID_PREDEF, &Length, pBuf);
-    if(Length > 1)
-    {
-        return Length;
-    }
-
     // Node Name not defined, use default name
     uint8_t pos;
     Length = (MQTTSN_SIZEOF_CLIENTID - sizeof(PHY1_ADDR_t) - 1);
@@ -76,43 +98,7 @@ static uint8_t mqttsn_build_node_name(uint8_t * pBuf)
         pBuf++;
     }
     Length += (sizeof(PHY1_ADDR_t)*2);
-
-    return Length;
-}
 */
-
-static uint8_t cbReadNodeName(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
-static uint8_t cbWriteNodeName(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
-
-
-static const indextable_t ListPOD[] = {
-    {{0, 0, 0}, cbReadNodeName, cbWriteNodeName, objNodeName},
-};
-static uint8_t      ListPODflag[sizeof(ListPOD)/sizeof(indextable_t)];
-
-
-static indextable_t ListOD[OD_MAX_INDEX_LIST];
-static uint8_t      ListODflag[OD_MAX_INDEX_LIST];
-
-
-//////////////////////////
-// Callback functions
-
-static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
-{
-    uint8_t Len = eepReadArray(eepNodeName, pBuf);
-    if(Len > 0)
-    {
-        *pLen = Len;
-        return MQTTSN_RET_ACCEPTED;
-    }
-    
-    // ToDo Default Name
-    
-    pBuf[0] = 'A';
-    pBuf[1] = 'B';
-    pBuf[2] = 'C';
-    *pLen = 3;
 
     return MQTTSN_RET_ACCEPTED;
 }
@@ -127,6 +113,12 @@ static uint8_t cbWriteNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8
     eepWriteArray(eepNodeName, Len, pBuf);
     return MQTTSN_RET_ACCEPTED;
 }
+
+// Callback functions
+//////////////////////////
+
+//////////////////////////
+// Local functions
 
 // Search Object by Index
 static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
@@ -158,6 +150,12 @@ static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
     return NULL;
 }
 
+// Local functions
+//////////////////////////
+
+
+//////////////////////////
+// OD API
 
 void OD_Init(void)
 {
@@ -174,6 +172,54 @@ void OD_Init(void)
     }
 }
 
+e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf)
+{
+    uint8_t tmpLen = 0;
+    if(pLen == NULL)
+    {
+        pLen = &tmpLen;
+    }
+
+    indextable_t * pIndex = scanIndexOD(Id, Flags);
+    if(pIndex == NULL)
+    {
+        *pLen = 0;
+        return MQTTSN_RET_REJ_INV_ID;
+    }
+
+    if(pIndex->cbRead == NULL)
+    {
+        *pLen = 0;
+        return MQTTSN_RET_REJ_NOT_SUPP;
+    }
+
+    e_MQTTSN_RETURNS_t retval;
+    retval = (pIndex->cbRead)(&pIndex->sidx, pLen, pBuf);
+    if(retval != MQTTSN_RET_ACCEPTED)
+    {
+        *pLen = 0;
+    }
+
+    return retval;
+}
+
+e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf)
+{
+    indextable_t * pIndex = scanIndexOD(Id, Flags);
+    if(pIndex == NULL)
+    {
+        return MQTTSN_RET_REJ_INV_ID;
+    }
+    
+    if(pIndex->cbWrite == NULL)
+    {
+        return MQTTSN_RET_REJ_NOT_SUPP;
+    }
+
+    return (pIndex->cbWrite)(&pIndex->sidx, Len, pBuf);
+}
+
+/*
 // Make Topic Name from record number
 uint8_t OD_MakeTopicName(uint8_t RecNR, uint8_t *pBuf)
 {
@@ -219,47 +265,9 @@ void OD_RegAck(uint16_t index)
 {
 }
 
-
-e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf)
-{
-    uint8_t tmpLen = 0;
-    if(pLen == NULL)
-    {
-        pLen = &tmpLen;
-    }
-
-    indextable_t * pIndex = scanIndexOD(Id, Flags);
-    if(pIndex == NULL)
-    {
-        *pLen = 0;
-        return MQTTSN_RET_REJ_INV_ID;
-    }
-
-    if(pIndex->cbRead == NULL)
-    {
-        *pLen = 0;
-        return MQTTSN_RET_REJ_NOT_SUPP;
-    }
-
-    e_MQTTSN_RETURNS_t retval;
-    retval = (pIndex->cbRead)(&pIndex->sidx, pLen, pBuf);
-    if(retval != MQTTSN_RET_ACCEPTED)
-    {
-        *pLen = 0;
-    }
-
-    return retval;
-}
-
 e_MQTTSN_RETURNS_t OD_ReadPack(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf)
 {
     *pLen = 0;
-    return MQTTSN_RET_REJ_NOT_SUPP;
-}
-
-
-e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf)
-{
     return MQTTSN_RET_REJ_NOT_SUPP;
 }
 
@@ -267,3 +275,4 @@ e_MQTTSN_RETURNS_t OD_WritePack(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t
 {
     return MQTTSN_RET_REJ_NOT_SUPP;
 }
+*/
