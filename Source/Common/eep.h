@@ -23,8 +23,13 @@ enum
 // Global
     eepFlag = 0,
     eepFlagBody,
+
     eepNodeName,
     eepNodeNameBody = eepNodeName + MQTTSN_SIZEOF_CLIENTID,
+
+    eepGateID,
+    eepGateIDBody = eepGateID + sizeof(PHY1_ADDR_t) - 1,
+
 /*
 // ASLEEP
     eeTASleep,
@@ -92,6 +97,9 @@ enum
 
 void    eepWriteArray(uint16_t Addr, uint8_t Len, uint8_t * pBuf);
 uint8_t eepReadArray(uint16_t Addr, uint8_t * pBuf);
+
+void    eepWriteRaw(uint16_t Addr, uint8_t Len, uint8_t * pBuf);
+void    eepReadRaw(uint16_t Addr, uint8_t Len, uint8_t * pBuf);
 
 
 #ifdef __cplusplus

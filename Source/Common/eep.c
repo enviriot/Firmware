@@ -9,8 +9,9 @@ BSD New License
 See LICENSE file for license details.
 */
 
-
+#include "config.h"
 #include "hal.h"
+#include "mqTypes.h"
 #include "eep.h"
 
 void eepWriteArray(uint16_t Addr, uint8_t Len, uint8_t * pBuf)
@@ -31,4 +32,14 @@ uint8_t eepReadArray(uint16_t Addr, uint8_t * pBuf)
         eeprom_read(pBuf, Addr + 1, Len);
     }
     return Len;
+}
+
+void eepWriteRaw(uint16_t Addr, uint8_t Len, uint8_t * pBuf)
+{
+    eeprom_write(pBuf, Addr, Len);
+}
+
+void eepReadRaw(uint16_t Addr, uint8_t Len, uint8_t * pBuf)
+{
+    eeprom_read(pBuf, Addr, Len);
 }

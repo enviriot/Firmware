@@ -22,7 +22,7 @@ enum
 {
     // Global Settings
     objNodeName         = (uint16_t)0xFF00, // _sName<String>
-/*
+
     objGateID           = (uint16_t)0xFF04, // cfg/XD_GateId
 
     // PHY Settings
@@ -31,7 +31,7 @@ enum
     objPHY1actualID     = (uint16_t)0xFF58,
     objPHY1undefID      = (uint16_t)0xFF59,
     objPHY1broadID      = (uint16_t)0xFF5A,
-
+/*
     // Read Only Variables
     objDeviceTyp        = (uint16_t)0xFFC0, // _declarer<String>
     objPHY1addr         = (uint16_t)0xFFC1, // cfg/_a_phy1

@@ -15,7 +15,6 @@ See LICENSE file for license details.
 #include <string.h>
 
 #include "config.h"
-
 #include "hal.h"
 #include "mqTypes.h"
 #include "mqMem.h"

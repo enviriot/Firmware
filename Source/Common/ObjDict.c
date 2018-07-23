@@ -12,7 +12,6 @@ See LICENSE file for license details.
 #include <stdlib.h>
 
 #include "config.h"
-
 #include "hal.h"
 #include "mqTypes.h"
 #include "eep.h"
@@ -22,9 +21,19 @@ See LICENSE file for license details.
 static uint8_t cbReadNodeName(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
 static uint8_t cbWriteNodeName(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
 
+static uint8_t cbReadGateID(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
+static uint8_t cbWriteGateID(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
 
 static const indextable_t ListPOD[] = {
+    // Global Settings
     {{0, 0, 0}, cbReadNodeName, cbWriteNodeName, objNodeName},
+    {{0, 0, 0}, cbReadGateID, cbWriteGateID, objGateID},
+    // PHY1 Settings
+    {{0, 0, 0x00}, cbReadPHY1, cbWritePHY1, objPHY1control},
+    {{0, 0, 0x01}, cbReadPHY1, cbWritePHY1, objPHY1nodeID},
+    {{0, 0, 0x18}, cbReadPHY1, NULL, objPHY1actualID},
+    {{0, 0, 0x19}, cbReadPHY1, NULL, objPHY1undefID},
+    {{0, 0, 0x1A}, cbReadPHY1, NULL, objPHY1broadID}
 };
 static uint8_t      ListPODflag[sizeof(ListPOD)/sizeof(indextable_t)];
 
@@ -44,9 +53,9 @@ static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_
         *pLen = Len;
         return MQTTSN_RET_ACCEPTED;
     }
-    
+
     // ToDo Default Name
-    
+
     pBuf[0] = 'A';
     pBuf[1] = 'B';
     pBuf[2] = 'C';
@@ -111,6 +120,24 @@ static uint8_t cbWriteNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8
     }
 
     eepWriteArray(eepNodeName, Len, pBuf);
+    return MQTTSN_RET_ACCEPTED;
+}
+
+static uint8_t cbReadGateID(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
+{
+    *pLen = sizeof(PHY1_ADDR_t);
+    eepReadRaw(eepGateID, sizeof(PHY1_ADDR_t), pBuf);
+    return MQTTSN_RET_ACCEPTED;
+}
+
+static uint8_t cbWriteGateID(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf)
+{
+    if(Len != sizeof(PHY1_ADDR_t))
+    {
+        return MQTTSN_RET_REJ_NOT_SUPP;
+    }
+
+    eepWriteRaw(eepGateID, sizeof(PHY1_ADDR_t), pBuf);
     return MQTTSN_RET_ACCEPTED;
 }
 
