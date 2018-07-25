@@ -108,6 +108,7 @@ static uint16_t mqttsn_get_random_delay(uint16_t delayMax, uint16_t delayMin)
     return (uint16_t)(ulTmp>>16) + delayMin;
 }
 
+/*
 // Get new outgoing message ID
 static uint16_t mqttsn_new_msgid(void)
 {
@@ -118,6 +119,7 @@ static uint16_t mqttsn_new_msgid(void)
     }
     return vMQ_MsgId;
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////
 // Parse incoming messages
@@ -1479,7 +1481,7 @@ void MQTTSN_Poll(void)
 // Initialize MQTTSN tasks
 void MQTTSN_Init(void)
 {
-    OD_Read(objGateID, MQTTSN_FL_TOPICID_PREDEF, NULL, (uint8_t *)vMQ_GatewayAddr);
+    OD_Read(objPHY1broker, MQTTSN_FL_TOPICID_PREDEF, NULL, (uint8_t *)vMQ_GatewayAddr);
 
 #ifdef MQTTSN_USE_DHCP
     if(memcmp(PHY1_GetAddr(), &addr1_undef, sizeof(PHY1_ADDR_t)) == 0)

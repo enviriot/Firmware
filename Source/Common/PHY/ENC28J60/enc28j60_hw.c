@@ -10,7 +10,8 @@ BSD New License
 See LICENSE file for license details.
 */
 
-#include "../../config.h"
+#include "config.h"
+#include "hal.h"
 
 #if (defined ENC_PHY)
 

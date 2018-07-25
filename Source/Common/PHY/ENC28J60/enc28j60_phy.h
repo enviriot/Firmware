@@ -31,25 +31,12 @@ extern "C" {
 #define PHY1_Ready                  ENC28J60_System_Ready
 #define PHY1_Send                   ENC28J60_Send
 #define PHY1_Get                    ENC28J60_Get
-//#define PHY1_GetAddr                ENC28J60_GetAddr
-//#define PHY1_NodeId                 objIPAddr
-//#define PHY1_GateId                 objIPBroker
 
-#define PHY1_SIZEOF_CFG             22
+#define PHY1_ReadOD                 ENC28J60_ReadOD
+#define PHY1_WriteOD                ENC28J60_WriteOD
 
-#elif (ENC_PHY == 2)
-
-#define PHY2_ADDR_t                 uint32_t
-//#define ADDR_BROADCAST_PHY2         (PHY1_ADDR_t)inet_addr(255,255,255,255)
-//#define ADDR_UNDEF_PHY2             (PHY1_ADDR_t)inet_addr(255,255,255,255)
-
-#define PHY2_Init                   ENC28J60_Init
-#define PHY2_Send                   ENC28J60_Send
-#define PHY2_Get                    ENC28J60_Get
-//#define PHY2_GetAddr                ENC28J60_GetAddr
-//#define PHY2_NodeId                 objIPAddr
-
-#define PHY2_SIZEOF_CFG             22
+#define PHY1_SIZEOF_CFG             24
+#define ENC_EEP                     eePhy1
 
 #else
 #error ENC_PHY unknown inteface
@@ -79,8 +66,10 @@ void ENC28J60_Init(void);
 bool ENC28J60_System_Ready(void);
 void ENC28J60_Send(void *pBuf);
 void * ENC28J60_Get(void);
-//void * ENC28J60_GetAddr(void);
-//void * ENC28G60_GetCB(uint16_t index);
+
+uint8_t ENC28J60_ReadOD(uint16_t idx, uint8_t *pLen, uint8_t *pBuf);
+uint8_t ENC28J60_WriteOD(uint16_t idx, uint8_t Len, uint8_t *pBuf);
+
 
 #ifdef __cplusplus
 }

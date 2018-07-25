@@ -30,6 +30,9 @@ enum
     eepGateID,
     eepGateIDBody = eepGateID + sizeof(PHY1_ADDR_t) - 1,
 
+    eePhy1,
+    eePhy1Body = eePhy1 + PHY1_SIZEOF_CFG - 1,
+
 /*
 // ASLEEP
     eeTASleep,

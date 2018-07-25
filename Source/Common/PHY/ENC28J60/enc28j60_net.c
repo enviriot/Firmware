@@ -10,12 +10,31 @@ BSD New License
 See LICENSE file for license details.
 */
 
-#include "../../config.h"
+#include <string.h>
+
+#include "config.h"
+#include "hal.h"
+#include "mqTypes.h"
+#include "mqMEM.h"
+#include "eep.h"
 
 #if (defined ENC_PHY)
 
 #include "enc28j60_hw.h"
 #include "enc28j60_net.h"
+
+
+#ifndef ENC28J60_DEFAULT_IP
+#define ENC28J60_DEFAULT_IP		0xFFFFFFFF
+#endif	// ENC28J60_DEFAULT_IP
+
+#ifndef ENC28J60_DEFAULT_MASK
+#define ENC28J60_DEFAULT_MASK	0xFFFFFFFF
+#endif	// ENC28J60_DEFAULT_MASK
+
+#ifndef ENC28J60_DEFAULT_GW
+#define ENC28J60_DEFAULT_GW		0xFFFFFFFF
+#endif	//	ENC28J60_DEFAULT_GW
 
 #define phy_send            enc28j60PacketSend
 #define phy_get             enc28j60_GetPacket
@@ -23,6 +42,17 @@ See LICENSE file for license details.
 
 #define SUBNET_BROADCAST    (ip_addr | ~ip_mask)
 #define NET_BROADCAST       0xFFFFFFFF
+#define UNDEF_IP            0xFFFFFFFF
+
+enum
+{
+    EncEepMac       = 0,        // 0  - 5
+    EncEepIP        = 6,        // 6  - 9
+    EncEepMask      = 10,       // 10 - 13
+    EncEepGW        = 14,       // 14 - 17
+    EncEepBroker    = 18,       // 18 - 21
+    EncEepCRC       = 22        // 22 - 23
+}eEncEep;
 
 typedef enum
 {
@@ -50,20 +80,62 @@ static uint32_t         dhcp_transaction_id;
 static uint32_t         dhcp_server;
 #endif
 
+static uint16_t ip_cksum(uint32_t sum, uint8_t *buf, size_t len);
+
+
+
 // Initialize network variables
 void enc28j60_init_net(void)
 {
-    // eeprom_read(pBuf, Base, *pLen);
-/*
-    uint8_t Len;
-    // Read Configuration data
-    Len = sizeof(mac_addr);
-    ReadOD(objMACAddr,    MQTTSN_FL_TOPICID_PREDEF, &Len, (uint8_t *)mac_addr);
-    Len = sizeof(ip_addr);
-    ReadOD(objIPAddr,     MQTTSN_FL_TOPICID_PREDEF, &Len, (uint8_t *)&ip_addr);
-    ReadOD(objIPMask,     MQTTSN_FL_TOPICID_PREDEF, &Len, (uint8_t *)&ip_mask);
-    ReadOD(objIPRouter,   MQTTSN_FL_TOPICID_PREDEF, &Len, (uint8_t *)&ip_gateway);
-*/ 
+    uint8_t eep[PHY1_SIZEOF_CFG];
+
+    eepReadRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
+
+    uint16_t eep_crc = eep[EncEepCRC + 1];
+    eep_crc *= 256;
+    eep_crc += eep[EncEepCRC];
+    
+    if(eep_crc != ip_cksum(0, eep, 22))
+    {
+#ifndef ENC28J60_DEFAULT_MAC
+        uint32_t ulTmp = hal_GetDeviceID();
+        mac_addr[0] = 0x00;       // Microchip
+        mac_addr[1] = 0x04;
+        mac_addr[2] = 0xA3;
+        mac_addr[3] = (ulTmp >> 16) & 0xFF;
+        mac_addr[4] = (ulTmp >> 8) & 0xFF;
+        mac_addr[5] = ulTmp & 0xFF;
+#else   //  ENC28J60_DEFAULT_MAC
+        uint8_t   defMAC[] = ENC28J60_DEFAULT_MAC;
+        memcpy(mac_addr, defMAC, 6);
+#endif  //  ENC28J60_DEFAULT_MAC
+
+        ip_addr = ENC28J60_DEFAULT_IP;
+        ip_mask = ENC28J60_DEFAULT_MASK;
+        ip_gateway = ENC28J60_DEFAULT_GW;
+
+        uint32_t broker_ip = UNDEF_IP;
+
+        memcpy(&eep[EncEepMac], mac_addr, sizeof(EncEepMac));
+        memcpy(&eep[EncEepIP], &ip_addr, sizeof(ip_addr));
+        memcpy(&eep[EncEepMask], &ip_mask, sizeof(ip_mask));
+        memcpy(&eep[EncEepGW], &ip_gateway, sizeof(ip_gateway));
+        memcpy(&eep[EncEepBroker], &broker_ip, sizeof(broker_ip));
+
+        eep_crc = ip_cksum(0, eep, 22);
+        eep[EncEepCRC] = eep_crc & 0xFF;
+        eep[EncEepCRC + 1] = eep_crc >> 8;
+
+        eepWriteRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
+    }
+    else
+    {
+        memcpy(mac_addr, &eep[EncEepMac], sizeof(EncEepMac));
+        memcpy(&ip_addr, &eep[EncEepIP], sizeof(ip_addr));
+        memcpy(&ip_mask, &eep[EncEepMask], sizeof(ip_mask));
+        memcpy(&ip_gateway, &eep[EncEepGW], sizeof(ip_gateway));
+    }
+
     //initialize enc28j60 hardware
     enc28j60Init(mac_addr);
 
@@ -83,6 +155,118 @@ void enc28j60_init_net(void)
     }
 #endif
 }
+
+//////////////////////////////////////////////////////////////////////
+// System API
+bool ENC28J60_System_Ready(void)
+{
+    return (system_status < DHCP_INIT);
+}
+
+uint8_t ENC28J60_ReadOD(uint16_t idx, uint8_t *pLen, uint8_t *pBuf)
+{
+    switch(idx)
+    {
+//        case 0x00:      // Control
+        case 0x01:      // IP Address
+            *pLen = 4;
+            eepReadRaw((ENC_EEP + EncEepIP), 4, pBuf);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x02:      // IP Mask
+            *pLen = 4;
+            memcpy(pBuf, &ip_mask, 4);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x03:      // IP Gateway
+            *pLen = 4;
+            memcpy(pBuf, &ip_gateway, 4);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x04:      // IP Broker
+            *pLen = 4;
+            eepReadRaw((ENC_EEP + EncEepBroker), 4, pBuf);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x0F:      // IP MAC
+            *pLen = 6;
+            memcpy(pBuf, mac_addr, 6);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x18:      // Actual IP
+            *pLen = 4;
+            memcpy(pBuf, &ip_addr, 4);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x19:      // Undefined ID
+        case 0x1A:      // Broadcast ID
+            *pLen = 4;
+            pBuf[0] = 0xFF;
+            pBuf[1] = 0xFF;
+            pBuf[2] = 0xFF;
+            pBuf[3] = 0xFF;
+            return MQTTSN_RET_ACCEPTED;
+
+        default:
+            break;
+    }
+    return MQTTSN_RET_REJ_INV_ID;
+}
+
+uint8_t ENC28J60_WriteOD(uint16_t idx, uint8_t Len, uint8_t *pBuf)
+{
+    switch(idx)
+    {
+//        case 0x00:      // Control
+        case 0x01:      // IP Address
+            if(Len != 4)
+            {
+                return MQTTSN_RET_REJ_NOT_SUPP;
+            }
+            eepWriteRaw((ENC_EEP + EncEepIP), 4, pBuf);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x02:      // IP Mask
+            if(Len != 4)
+            {
+                return MQTTSN_RET_REJ_NOT_SUPP;
+            }
+            eepWriteRaw((ENC_EEP + EncEepMask), 4, pBuf);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x03:      // IP Gateway
+            if(Len != 4)
+            {
+                return MQTTSN_RET_REJ_NOT_SUPP;
+            }
+            eepWriteRaw((ENC_EEP + EncEepGW), 4, pBuf);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x04:      // IP Broker
+            if(Len != 4)
+            {
+                return MQTTSN_RET_REJ_NOT_SUPP;
+            }
+            eepWriteRaw((ENC_EEP + EncEepBroker), 4, pBuf);
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x0F:      // IP MAC
+            if(Len != 6)
+            {
+                return MQTTSN_RET_REJ_NOT_SUPP;
+            }
+            eepWriteRaw((ENC_EEP + EncEepMac), 6, pBuf);
+            return MQTTSN_RET_ACCEPTED;
+
+        default:
+            break;
+    }
+    return MQTTSN_RET_REJ_INV_ID;
+}
+
+// End System API
+//////////////////////////////////////////////////////////////////////
+
 
 //////////////////////////////////////////////////////////////////////
 // Ethernet Section
@@ -191,7 +375,7 @@ static uint16_t ip_cksum(uint32_t sum, uint8_t *buf, size_t len)
     {
         uiTmp = ((uint16_t)*buf << 8) | *(buf+1);
         buf += 2;
-        len -= 2;  
+        len -= 2;
 
         sum += uiTmp;
     }
@@ -354,23 +538,6 @@ static void icmp_filter(uint16_t len, eth_frame_t * pFrame)
 // End ICMP Section
 //////////////////////////////////////////////////////////////////////
 #endif  //  NET_WITH_ICMP
-
-
-//////////////////////////////////////////////////////////////////////
-// System API
-bool ENC28J60_System_Ready(void)
-{
-    return (system_status < DHCP_INIT);
-}
-
-/*
-void * ENC28J60_GetAddr(void)
-{
-    return &ip_addr;
-}
-*/
-// End System API
-//////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////
 // UDP Section

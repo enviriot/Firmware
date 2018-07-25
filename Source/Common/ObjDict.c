@@ -21,19 +21,29 @@ See LICENSE file for license details.
 static uint8_t cbReadNodeName(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
 static uint8_t cbWriteNodeName(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
 
-static uint8_t cbReadGateID(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
-static uint8_t cbWriteGateID(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
+static uint8_t cbReadPHY1(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
+static uint8_t cbWritePHY1(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
+
 
 static const indextable_t ListPOD[] = {
     // Global Settings
     {{0, 0, 0}, cbReadNodeName, cbWriteNodeName, objNodeName},
-    {{0, 0, 0}, cbReadGateID, cbWriteGateID, objGateID},
+
     // PHY1 Settings
     {{0, 0, 0x00}, cbReadPHY1, cbWritePHY1, objPHY1control},
-    {{0, 0, 0x01}, cbReadPHY1, cbWritePHY1, objPHY1nodeID},
+    {{0, 0, 0x01}, cbReadPHY1, cbWritePHY1, objPHY1address},
+    {{0, 0, 0x02}, cbReadPHY1, cbWritePHY1, objPHY1mask},
+    {{0, 0, 0x03}, cbReadPHY1, cbWritePHY1, objPHY1gate},
+    {{0, 0, 0x04}, cbReadPHY1, cbWritePHY1, objPHY1broker},
+    {{0, 0, 0x05}, cbReadPHY1, cbWritePHY1, objPHY1group},
+    {{0, 0, 0x06}, cbReadPHY1, cbWritePHY1, objPHY1channel},
+    {{0, 0, 0x08}, cbReadPHY1, cbWritePHY1, objPHY1power},
+    {{0, 0, 0x09}, cbReadPHY1, cbWritePHY1, objPHY1key},
+    {{0, 0, 0x0F}, cbReadPHY1, cbWritePHY1, objPHY1mac},
     {{0, 0, 0x18}, cbReadPHY1, NULL, objPHY1actualID},
     {{0, 0, 0x19}, cbReadPHY1, NULL, objPHY1undefID},
-    {{0, 0, 0x1A}, cbReadPHY1, NULL, objPHY1broadID}
+    {{0, 0, 0x1A}, cbReadPHY1, NULL, objPHY1broadID},
+    {{0, 0, 0x1F}, cbReadPHY1, NULL, objPHY1rssi},
 };
 static uint8_t      ListPODflag[sizeof(ListPOD)/sizeof(indextable_t)];
 
@@ -123,22 +133,15 @@ static uint8_t cbWriteNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8
     return MQTTSN_RET_ACCEPTED;
 }
 
-static uint8_t cbReadGateID(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
+// PHY Section
+static uint8_t cbReadPHY1(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
 {
-    *pLen = sizeof(PHY1_ADDR_t);
-    eepReadRaw(eepGateID, sizeof(PHY1_ADDR_t), pBuf);
-    return MQTTSN_RET_ACCEPTED;
+    return PHY1_ReadOD(pSubidx->Base, pLen, pBuf);
 }
 
-static uint8_t cbWriteGateID(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf)
+static uint8_t cbWritePHY1(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf)
 {
-    if(Len != sizeof(PHY1_ADDR_t))
-    {
-        return MQTTSN_RET_REJ_NOT_SUPP;
-    }
-
-    eepWriteRaw(eepGateID, sizeof(PHY1_ADDR_t), pBuf);
-    return MQTTSN_RET_ACCEPTED;
+    return PHY1_WriteOD(pSubidx->Base, Len, pBuf);
 }
 
 // Callback functions

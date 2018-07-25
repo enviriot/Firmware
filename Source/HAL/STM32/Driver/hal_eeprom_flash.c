@@ -49,6 +49,7 @@ See LICENSE file for license details.
 //#define FEE_BASE    (uint32_t)fee_data
 
 #include "config.h"
+#include "hal.h"
 
 #ifdef FEE_SIZE
 

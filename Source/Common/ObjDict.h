@@ -23,21 +23,24 @@ enum
     // Global Settings
     objNodeName         = (uint16_t)0xFF00, // _sName<String>
 
-    objGateID           = (uint16_t)0xFF04, // cfg/XD_GateId
-
     // PHY Settings
     objPHY1control      = (uint16_t)0xFF40,
-    objPHY1nodeID       = (uint16_t)0xFF41,
+    objPHY1address      = (uint16_t)0xFF41,
+    objPHY1mask         = (uint16_t)0xFF42,
+    objPHY1gate         = (uint16_t)0xFF43,
+    objPHY1broker       = (uint16_t)0xFF44,
+    objPHY1group        = (uint16_t)0xFF45,
+    objPHY1channel      = (uint16_t)0xFF46,
+    objPHY1power        = (uint16_t)0xFF48,
+    objPHY1key          = (uint16_t)0xFF49,
+    objPHY1mac          = (uint16_t)0xFF4F,
     objPHY1actualID     = (uint16_t)0xFF58,
     objPHY1undefID      = (uint16_t)0xFF59,
     objPHY1broadID      = (uint16_t)0xFF5A,
+    objPHY1rssi         = (uint16_t)0xFF5F,
 /*
     // Read Only Variables
     objDeviceTyp        = (uint16_t)0xFFC0, // _declarer<String>
-    objPHY1addr         = (uint16_t)0xFFC1, // cfg/_a_phy1
-    objPHY2addr         = (uint16_t)0xFFC2, // cfg/_a_phy2
-    objPHY3addr         = (uint16_t)0xFFC3, // cfg/_a_phy3
-    objPHY4addr         = (uint16_t)0xFFC4, // cfg/_a_phy4
 */
     // Debug Variables
     objLogD             = (uint16_t)0xFFE0, // Data logging, log level - Debug
