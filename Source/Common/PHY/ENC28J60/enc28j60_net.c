@@ -25,18 +25,17 @@ See LICENSE file for license details.
 
 
 #ifndef ENC28J60_DEFAULT_IP
-#define ENC28J60_DEFAULT_IP		0xFFFFFFFF
-#endif	// ENC28J60_DEFAULT_IP
+#define ENC28J60_DEFAULT_IP     0xFFFFFFFF
+#endif  // ENC28J60_DEFAULT_IP
 
 #ifndef ENC28J60_DEFAULT_MASK
-#define ENC28J60_DEFAULT_MASK	0xFFFFFFFF
-#endif	// ENC28J60_DEFAULT_MASK
+#define ENC28J60_DEFAULT_MASK   0xFFFFFFFF
+#endif  // ENC28J60_DEFAULT_MASK
 
 #ifndef ENC28J60_DEFAULT_GW
-#define ENC28J60_DEFAULT_GW		0xFFFFFFFF
-#endif	//	ENC28J60_DEFAULT_GW
+#define ENC28J60_DEFAULT_GW     0xFFFFFFFF
+#endif  //  ENC28J60_DEFAULT_GW
 
-#define phy_send            enc28j60PacketSend
 #define phy_get             enc28j60_GetPacket
 #define phy_skip            enc28j60_Skip
 
@@ -215,6 +214,8 @@ uint8_t ENC28J60_ReadOD(uint16_t idx, uint8_t *pLen, uint8_t *pBuf)
 
 uint8_t ENC28J60_WriteOD(uint16_t idx, uint8_t Len, uint8_t *pBuf)
 {
+    uint8_t offset;
+
     switch(idx)
     {
 //        case 0x00:      // Control
@@ -223,45 +224,56 @@ uint8_t ENC28J60_WriteOD(uint16_t idx, uint8_t Len, uint8_t *pBuf)
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            eepWriteRaw((ENC_EEP + EncEepIP), 4, pBuf);
-            return MQTTSN_RET_ACCEPTED;
+            offset = EncEepIP;
+            break;
 
         case 0x02:      // IP Mask
             if(Len != 4)
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            eepWriteRaw((ENC_EEP + EncEepMask), 4, pBuf);
-            return MQTTSN_RET_ACCEPTED;
+            offset = EncEepMask;
+            break;
 
         case 0x03:      // IP Gateway
             if(Len != 4)
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            eepWriteRaw((ENC_EEP + EncEepGW), 4, pBuf);
-            return MQTTSN_RET_ACCEPTED;
+            offset = EncEepGW;
+            break;
 
         case 0x04:      // IP Broker
             if(Len != 4)
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            eepWriteRaw((ENC_EEP + EncEepBroker), 4, pBuf);
-            return MQTTSN_RET_ACCEPTED;
+            offset = EncEepBroker;
+            break;
 
         case 0x0F:      // IP MAC
             if(Len != 6)
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            eepWriteRaw((ENC_EEP + EncEepMac), 6, pBuf);
-            return MQTTSN_RET_ACCEPTED;
+            offset = EncEepMac;
+            break;
 
         default:
-            break;
+            return MQTTSN_RET_REJ_INV_ID;
     }
-    return MQTTSN_RET_REJ_INV_ID;
+
+    uint8_t eep[PHY1_SIZEOF_CFG];
+    eepReadRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
+
+    memcpy(&eep[offset], pBuf, Len);
+
+    uint16_t  eep_crc = ip_cksum(0, eep, 22);
+    eep[EncEepCRC] = eep_crc & 0xFF;
+    eep[EncEepCRC + 1] = eep_crc >> 8;
+
+    eepWriteRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
+    return MQTTSN_RET_ACCEPTED;
 }
 
 // End System API

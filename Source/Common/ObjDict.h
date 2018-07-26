@@ -38,10 +38,10 @@ enum
     objPHY1undefID      = (uint16_t)0xFF59,
     objPHY1broadID      = (uint16_t)0xFF5A,
     objPHY1rssi         = (uint16_t)0xFF5F,
-/*
+
     // Read Only Variables
     objDeviceTyp        = (uint16_t)0xFFC0, // _declarer<String>
-*/
+
     // Debug Variables
     objLogD             = (uint16_t)0xFFE0, // Data logging, log level - Debug
     objLogI             = (uint16_t)0xFFE1, // Data logging, log level - Info
@@ -76,6 +76,8 @@ void OD_Init(void);
 
 e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf);
 e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf);
+void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event);
+
 
 /*
 uint8_t OD_MakeTopicName(uint8_t RecNR, uint8_t *pBuf);

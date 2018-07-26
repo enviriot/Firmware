@@ -24,6 +24,27 @@ static uint8_t cbWriteNodeName(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
 static uint8_t cbReadPHY1(subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf);
 static uint8_t cbWritePHY1(subidx_t *pSubidx, uint8_t Len, uint8_t *pBuf);
 
+// Predefined Object's
+static const uint8_t psDeviceTyp[] = {
+                                OD_DEV_UC_TYPE,           // uC Family
+                                OD_DEV_UC_SUBTYPE,        // uC SubType
+                                OD_DEV_PHY1,              // PHY1 type
+#ifdef OD_DEV_PHY2
+                                OD_DEV_PHY2,              // PHY2 type
+#endif  // OD_DEV_PHY2
+#ifdef OD_DEV_PHY3
+                                OD_DEV_PHY3,              // PHY3 type
+#endif  // OD_DEV_PHY3
+#ifdef OD_DEV_PHY4
+                                OD_DEV_PHY4,              // PHY4 type
+#endif  // OD_DEV_PHY4
+                                OD_DEV_HW_TYP_H,          // HW Version High
+                                OD_DEV_HW_TYP_L,          // HW Version Low
+                                '.',                      // Delimiter
+                                OD_DEV_SWVERSH,           // Software Version
+                                OD_DEV_SWVERSM,
+                                OD_DEV_SWVERSL};
+
 
 static const indextable_t ListPOD[] = {
     // Global Settings
@@ -44,16 +65,19 @@ static const indextable_t ListPOD[] = {
     {{0, 0, 0x19}, cbReadPHY1, NULL, objPHY1undefID},
     {{0, 0, 0x1A}, cbReadPHY1, NULL, objPHY1broadID},
     {{0, 0, 0x1F}, cbReadPHY1, NULL, objPHY1rssi},
+
+    //{{0, 0, 0}, cbReadDeviceType, NULL, objDeviceTyp}
 };
-static uint8_t      ListPODflag[sizeof(ListPOD)/sizeof(indextable_t)];
+static uint8_t      ListPODevent[sizeof(ListPOD)/sizeof(indextable_t)];
 
 
 static indextable_t ListOD[OD_MAX_INDEX_LIST];
-static uint8_t      ListODflag[OD_MAX_INDEX_LIST];
+static uint8_t      ListODevent[OD_MAX_INDEX_LIST];
 
 
 //////////////////////////
 // Callback functions
+
 
 static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
 {
@@ -162,6 +186,7 @@ static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
         {
             if(ListOD[i].Index == index)
             {
+                ListODevent[i] = 0;
                 return &ListOD[i];
             }
         }
@@ -172,6 +197,7 @@ static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
         {
             if(ListPOD[i].Index == index)
             {
+                ListPODevent[i] = 0;
                 return (indextable_t *)&ListPOD[i];
             }
         }
@@ -189,20 +215,36 @@ static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
 
 void OD_Init(void)
 {
-    uint8_t pos;
-    for(pos = 0; pos < OD_MAX_INDEX_LIST; pos++)
+    uint8_t     ucTmp;
+    uint16_t    uiTmp, Flag = 0;
+
+    eepReadRaw(eepFlag, 2, (uint8_t *)&uiTmp);
+
+    for(ucTmp = 0; ucTmp < sizeof(psDeviceTyp); ucTmp++)
     {
-        ListOD[pos].Index = 0xFFFF;
-        ListODflag[pos] = 0;
+        Flag += psDeviceTyp[ucTmp];
     }
 
-    for(pos = 0; pos < (sizeof(ListPOD)/sizeof(indextable_t)); pos++)
+    if(uiTmp != Flag)
     {
-        ListPODflag[pos] = 0;
+        // ToDo Load Default Settings
+        OD_Write(objNodeName, MQTTSN_FL_TOPICID_PREDEF, 0, NULL);       // Device Name
+        eepWriteRaw(eepFlag, 2, (uint8_t *)&Flag);
+    }
+
+    for(ucTmp = 0; ucTmp < OD_MAX_INDEX_LIST; ucTmp++)
+    {
+        ListOD[ucTmp].Index = 0xFFFF;
+        ListODevent[ucTmp] = 0;
+    }
+
+    for(ucTmp = 0; ucTmp < (sizeof(ListPOD)/sizeof(indextable_t)); ucTmp++)
+    {
+        ListPODevent[ucTmp] = 0;
     }
 }
 
-e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf)
+e_MQTTSN_RETURNS_t OD_Read(uint16_t Index, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf)
 {
     uint8_t tmpLen = 0;
     if(pLen == NULL)
@@ -210,7 +252,7 @@ e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *p
         pLen = &tmpLen;
     }
 
-    indextable_t * pIndex = scanIndexOD(Id, Flags);
+    indextable_t * pIndex = scanIndexOD(Index, Flags);
     if(pIndex == NULL)
     {
         *pLen = 0;
@@ -233,9 +275,9 @@ e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *p
     return retval;
 }
 
-e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf)
+e_MQTTSN_RETURNS_t OD_Write(uint16_t Index, uint8_t Flags, uint8_t Len, uint8_t *pBuf)
 {
-    indextable_t * pIndex = scanIndexOD(Id, Flags);
+    indextable_t * pIndex = scanIndexOD(Index, Flags);
     if(pIndex == NULL)
     {
         return MQTTSN_RET_REJ_INV_ID;
@@ -248,6 +290,37 @@ e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pB
 
     return (pIndex->cbWrite)(&pIndex->sidx, Len, pBuf);
 }
+
+void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event)
+{
+    uint16_t i;
+
+    Flags &= MQTTSN_FL_TOPICID_MASK;
+    if(Flags == MQTTSN_FL_TOPICID_NORM)
+    {
+        for(i = 0; i < OD_MAX_INDEX_LIST; i++)
+        {
+            if(ListOD[i].Index == Index)
+            {
+                ListODevent[i] = Event;
+                break;
+            }
+        }
+    }
+    else if(Flags == MQTTSN_FL_TOPICID_PREDEF)
+    {
+        for(i = 0; i < sizeof(ListPOD)/sizeof(indextable_t); i++)
+        {
+            if(ListPOD[i].Index == Index)
+            {
+                ListPODevent[i] = Event;
+                break;
+            }
+        }
+    }
+}
+
+
 
 /*
 // Make Topic Name from record number
