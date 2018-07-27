@@ -49,8 +49,7 @@ enum
     EncEepIP        = 6,        // 6  - 9
     EncEepMask      = 10,       // 10 - 13
     EncEepGW        = 14,       // 14 - 17
-    EncEepBroker    = 18,       // 18 - 21
-    EncEepCRC       = 22        // 22 - 23
+    EncEepBroker    = 18        // 18 - 21
 }eEncEep;
 
 typedef enum
@@ -79,61 +78,57 @@ static uint32_t         dhcp_transaction_id;
 static uint32_t         dhcp_server;
 #endif
 
-static uint16_t ip_cksum(uint32_t sum, uint8_t *buf, size_t len);
+static void enc28j60_defaults(void)
+{
+    uint8_t eep[PHY1_SIZEOF_CFG];
 
+#ifndef ENC28J60_DEFAULT_MAC
+    uint32_t ulTmp = hal_GetDeviceID();
+    mac_addr[0] = 0x00;       // Microchip
+    mac_addr[1] = 0x04;
+    mac_addr[2] = 0xA3;
+    mac_addr[3] = (ulTmp >> 16) & 0xFF;
+    mac_addr[4] = (ulTmp >> 8) & 0xFF;
+    mac_addr[5] = ulTmp & 0xFF;
+#else   //  ENC28J60_DEFAULT_MAC
+    uint8_t   defMAC[] = ENC28J60_DEFAULT_MAC;
+    memcpy(mac_addr, defMAC, 6);
+#endif  //  ENC28J60_DEFAULT_MAC
 
+    ip_addr = ENC28J60_DEFAULT_IP;
+    ip_mask = ENC28J60_DEFAULT_MASK;
+    ip_gateway = ENC28J60_DEFAULT_GW;
+
+    uint32_t broker_ip = UNDEF_IP;
+
+    memcpy(&eep[EncEepMac], mac_addr, sizeof(EncEepMac));
+    memcpy(&eep[EncEepIP], &ip_addr, sizeof(ip_addr));
+    memcpy(&eep[EncEepMask], &ip_mask, sizeof(ip_mask));
+    memcpy(&eep[EncEepGW], &ip_gateway, sizeof(ip_gateway));
+    memcpy(&eep[EncEepBroker], &broker_ip, sizeof(broker_ip));
+
+    eepWriteRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
+}
+
+static void enc28j60_command(uint16_t cmd)
+{
+    switch(cmd)
+    {
+        case 0xDEFA:
+            enc28j60_defaults();
+            break;
+        default:
+            break;
+    }
+}
 
 // Initialize network variables
 void enc28j60_init_net(void)
 {
-    uint8_t eep[PHY1_SIZEOF_CFG];
-
-    eepReadRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
-
-    uint16_t eep_crc = eep[EncEepCRC + 1];
-    eep_crc *= 256;
-    eep_crc += eep[EncEepCRC];
-    
-    if(eep_crc != ip_cksum(0, eep, 22))
-    {
-#ifndef ENC28J60_DEFAULT_MAC
-        uint32_t ulTmp = hal_GetDeviceID();
-        mac_addr[0] = 0x00;       // Microchip
-        mac_addr[1] = 0x04;
-        mac_addr[2] = 0xA3;
-        mac_addr[3] = (ulTmp >> 16) & 0xFF;
-        mac_addr[4] = (ulTmp >> 8) & 0xFF;
-        mac_addr[5] = ulTmp & 0xFF;
-#else   //  ENC28J60_DEFAULT_MAC
-        uint8_t   defMAC[] = ENC28J60_DEFAULT_MAC;
-        memcpy(mac_addr, defMAC, 6);
-#endif  //  ENC28J60_DEFAULT_MAC
-
-        ip_addr = ENC28J60_DEFAULT_IP;
-        ip_mask = ENC28J60_DEFAULT_MASK;
-        ip_gateway = ENC28J60_DEFAULT_GW;
-
-        uint32_t broker_ip = UNDEF_IP;
-
-        memcpy(&eep[EncEepMac], mac_addr, sizeof(EncEepMac));
-        memcpy(&eep[EncEepIP], &ip_addr, sizeof(ip_addr));
-        memcpy(&eep[EncEepMask], &ip_mask, sizeof(ip_mask));
-        memcpy(&eep[EncEepGW], &ip_gateway, sizeof(ip_gateway));
-        memcpy(&eep[EncEepBroker], &broker_ip, sizeof(broker_ip));
-
-        eep_crc = ip_cksum(0, eep, 22);
-        eep[EncEepCRC] = eep_crc & 0xFF;
-        eep[EncEepCRC + 1] = eep_crc >> 8;
-
-        eepWriteRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
-    }
-    else
-    {
-        memcpy(mac_addr, &eep[EncEepMac], sizeof(EncEepMac));
-        memcpy(&ip_addr, &eep[EncEepIP], sizeof(ip_addr));
-        memcpy(&ip_mask, &eep[EncEepMask], sizeof(ip_mask));
-        memcpy(&ip_gateway, &eep[EncEepGW], sizeof(ip_gateway));
-    }
+    eepReadRaw((ENC_EEP + EncEepMac), sizeof(mac_addr), mac_addr);
+    eepReadRaw((ENC_EEP + EncEepIP), sizeof(ip_addr), (uint8_t *)&ip_addr);
+    eepReadRaw((ENC_EEP + EncEepMask), sizeof(ip_mask), (uint8_t *)&ip_mask);
+    eepReadRaw((ENC_EEP + EncEepGW),  sizeof(ip_gateway), (uint8_t *)&ip_gateway);
 
     //initialize enc28j60 hardware
     enc28j60Init(mac_addr);
@@ -214,66 +209,65 @@ uint8_t ENC28J60_ReadOD(uint16_t idx, uint8_t *pLen, uint8_t *pBuf)
 
 uint8_t ENC28J60_WriteOD(uint16_t idx, uint8_t Len, uint8_t *pBuf)
 {
-    uint8_t offset;
-
     switch(idx)
     {
-//        case 0x00:      // Control
-        case 0x01:      // IP Address
-            if(Len != 4)
+        case 0x00:      // Control
+            if(Len != 2)
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            offset = EncEepIP;
-            break;
+            {
+            uint16_t cmd = *pBuf;
+            cmd += (*(pBuf + 1)) * 256;
+            enc28j60_command(cmd);
+            }
+            return MQTTSN_RET_ACCEPTED;
+
+        case 0x01:      // IP Address
+            if(Len != sizeof(ip_addr))
+            {
+                return MQTTSN_RET_REJ_NOT_SUPP;
+            }
+            eepWriteRaw((ENC_EEP + EncEepIP), sizeof(ip_addr), pBuf);
+            return MQTTSN_RET_ACCEPTED;
 
         case 0x02:      // IP Mask
-            if(Len != 4)
+            if(Len != sizeof(ip_mask))
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            offset = EncEepMask;
-            break;
+            eepWriteRaw((ENC_EEP + EncEepMask), sizeof(ip_mask), pBuf);
+            return MQTTSN_RET_ACCEPTED;
 
         case 0x03:      // IP Gateway
-            if(Len != 4)
+            if(Len != sizeof(ip_mask))
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            offset = EncEepGW;
-            break;
+            eepWriteRaw((ENC_EEP + EncEepGW), sizeof(ip_gateway), pBuf);
+            return MQTTSN_RET_ACCEPTED;
 
         case 0x04:      // IP Broker
-            if(Len != 4)
+            if(Len != sizeof(ip_addr))
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            offset = EncEepBroker;
-            break;
+            eepWriteRaw((ENC_EEP + EncEepBroker), sizeof(ip_addr), pBuf);
+            return MQTTSN_RET_ACCEPTED;
 
         case 0x0F:      // IP MAC
             if(Len != 6)
             {
                 return MQTTSN_RET_REJ_NOT_SUPP;
             }
-            offset = EncEepMac;
-            break;
+            eepWriteRaw((ENC_EEP + EncEepMac), sizeof(mac_addr), pBuf);
+            return MQTTSN_RET_ACCEPTED;
 
         default:
-            return MQTTSN_RET_REJ_INV_ID;
+            break;
     }
 
-    uint8_t eep[PHY1_SIZEOF_CFG];
-    eepReadRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
-
-    memcpy(&eep[offset], pBuf, Len);
-
-    uint16_t  eep_crc = ip_cksum(0, eep, 22);
-    eep[EncEepCRC] = eep_crc & 0xFF;
-    eep[EncEepCRC + 1] = eep_crc >> 8;
-
-    eepWriteRaw(ENC_EEP, PHY1_SIZEOF_CFG, eep);
-    return MQTTSN_RET_ACCEPTED;
+    return MQTTSN_RET_REJ_INV_ID;
 }
 
 // End System API

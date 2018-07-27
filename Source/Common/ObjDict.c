@@ -9,6 +9,9 @@ BSD New License
 See LICENSE file for license details.
 */
 
+
+// ToDo Clear enent only on read
+
 #include <stdlib.h>
 
 #include "config.h"
@@ -51,7 +54,7 @@ static const indextable_t ListPOD[] = {
     {{0, 0, 0}, cbReadNodeName, cbWriteNodeName, objNodeName},
 
     // PHY1 Settings
-    {{0, 0, 0x00}, cbReadPHY1, cbWritePHY1, objPHY1control},
+    {{0, 0, 0x00}, NULL, cbWritePHY1, objPHY1control},
     {{0, 0, 0x01}, cbReadPHY1, cbWritePHY1, objPHY1address},
     {{0, 0, 0x02}, cbReadPHY1, cbWritePHY1, objPHY1mask},
     {{0, 0, 0x03}, cbReadPHY1, cbWritePHY1, objPHY1gate},
@@ -64,10 +67,12 @@ static const indextable_t ListPOD[] = {
     {{0, 0, 0x18}, cbReadPHY1, NULL, objPHY1actualID},
     {{0, 0, 0x19}, cbReadPHY1, NULL, objPHY1undefID},
     {{0, 0, 0x1A}, cbReadPHY1, NULL, objPHY1broadID},
-    {{0, 0, 0x1F}, cbReadPHY1, NULL, objPHY1rssi},
+    {{0, 0, 0x1F}, cbReadPHY1, NULL, objPHY1rssi}
 
-    //{{0, 0, 0}, cbReadDeviceType, NULL, objDeviceTyp}
+    /*{{0, 0, 0}, cbReadDeviceType, NULL, objDeviceTyp}*/
 };
+
+
 static uint8_t      ListPODevent[sizeof(ListPOD)/sizeof(indextable_t)];
 
 
@@ -78,7 +83,6 @@ static uint8_t      ListODevent[OD_MAX_INDEX_LIST];
 //////////////////////////
 // Callback functions
 
-
 static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_t *pLen, uint8_t *pBuf)
 {
     uint8_t Len = eepReadArray(eepNodeName, pBuf);
@@ -88,34 +92,22 @@ static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_
         return MQTTSN_RET_ACCEPTED;
     }
 
-    // ToDo Default Name
-
-    pBuf[0] = 'A';
-    pBuf[1] = 'B';
-    pBuf[2] = 'C';
-    *pLen = 3;
-
-/*
     // Node Name not defined, use default name
-    uint8_t pos;
-    Length = (MQTTSN_SIZEOF_CLIENTID - sizeof(PHY1_ADDR_t) - 1);
-    OD_Read(objDeviceTyp, MQTTSN_FL_TOPICID_PREDEF, &Length, pBuf);
-    // Search Delimiter
-    for(pos = 0; (pos < Length) && (pBuf[pos] != '.'); pos++);
-    Length = pos;
-    pBuf += Length;
+    uint8_t pos, Length;
+    for(Length = 0; (Length < sizeof(psDeviceTyp)) && (psDeviceTyp[Length] != '.'); Length++)
+    {
+        *(pBuf++) = psDeviceTyp[Length];
+    }
+
     *(pBuf++) = '_';
     Length++;
 
-    //uint8_t * pAddr = PHY1_GetAddr();
-
     uint8_t phy1_addr[sizeof(PHY1_ADDR_t)];
-    pos = sizeof(PHY1_ADDR_t);
-    OD_Read(objPHY1actualID, MQTTSN_FL_TOPICID_PREDEF, &pos, phy1_addr);
+    OD_Read(objPHY1actualID, MQTTSN_FL_TOPICID_PREDEF, NULL, phy1_addr);
 
     for(pos = 0; pos < sizeof(PHY1_ADDR_t); pos++)
     {
-        uint8_t zif = phy1_addr[pos];   // *(pAddr++);
+        uint8_t zif = phy1_addr[pos];
         uint8_t ch = zif>>4;
         if(ch > 0x09)
         {
@@ -141,7 +133,7 @@ static uint8_t cbReadNodeName(__attribute__ ((unused)) subidx_t *pSubidx, uint8_
         pBuf++;
     }
     Length += (sizeof(PHY1_ADDR_t)*2);
-*/
+    *pLen = Length;
 
     return MQTTSN_RET_ACCEPTED;
 }
@@ -206,6 +198,25 @@ static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
     return NULL;
 }
 
+// Load Default Settings
+static void od_defaults(void)
+{
+    // PHY's Load Defaults Settings
+    uint16_t uiTmp = 0xDEFA;
+    OD_Write(objPHY1control, MQTTSN_FL_TOPICID_PREDEF, 2, (uint8_t *)&uiTmp);
+#ifdef OD_DEV_PHY2
+    OD_Write(objPHY2control, MQTTSN_FL_TOPICID_PREDEF, 2, (uint8_t *)&uiTmp);
+#endif  // OD_DEV_PHY2
+#ifdef OD_DEV_PHY3
+    OD_Write(objPHY3control, MQTTSN_FL_TOPICID_PREDEF, 2, (uint8_t *)&uiTmp);
+#endif  // OD_DEV_PHY3
+#ifdef OD_DEV_PHY4
+    OD_Write(objPHY4control, MQTTSN_FL_TOPICID_PREDEF, 2, (uint8_t *)&uiTmp);
+#endif  // OD_DEV_PHY4
+
+    OD_Write(objNodeName, MQTTSN_FL_TOPICID_PREDEF, 0, NULL);       // Device Name
+}
+
 // Local functions
 //////////////////////////
 
@@ -227,8 +238,7 @@ void OD_Init(void)
 
     if(uiTmp != Flag)
     {
-        // ToDo Load Default Settings
-        OD_Write(objNodeName, MQTTSN_FL_TOPICID_PREDEF, 0, NULL);       // Device Name
+        od_defaults();
         eepWriteRaw(eepFlag, 2, (uint8_t *)&Flag);
     }
 
@@ -302,7 +312,7 @@ void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event)
         {
             if(ListOD[i].Index == Index)
             {
-                ListODevent[i] = Event;
+                ListODevent[i] |= Event;
                 break;
             }
         }
@@ -313,7 +323,7 @@ void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event)
         {
             if(ListPOD[i].Index == Index)
             {
-                ListPODevent[i] = Event;
+                ListPODevent[i] |= Event;
                 break;
             }
         }
