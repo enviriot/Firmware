@@ -178,7 +178,7 @@ static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
         {
             if(ListOD[i].Index == index)
             {
-                ListODevent[i] = 0;
+                ListODevent[i] &= ~evtReady;
                 return &ListOD[i];
             }
         }
@@ -189,7 +189,7 @@ static indextable_t * scanIndexOD(uint16_t index, uint8_t flags)
         {
             if(ListPOD[i].Index == index)
             {
-                ListPODevent[i] = 0;
+                ListPODevent[i] = &= ~evtReady;
                 return (indextable_t *)&ListPOD[i];
             }
         }
@@ -301,7 +301,7 @@ e_MQTTSN_RETURNS_t OD_Write(uint16_t Index, uint8_t Flags, uint8_t Len, uint8_t 
     return (pIndex->cbWrite)(&pIndex->sidx, Len, pBuf);
 }
 
-void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event)
+void OD_SetEventReady(uint16_t Index, uint8_t Flags)
 {
     uint16_t i;
 
@@ -312,7 +312,7 @@ void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event)
         {
             if(ListOD[i].Index == Index)
             {
-                ListODevent[i] |= Event;
+                ListODevent[i] |= evtReady;
                 break;
             }
         }
@@ -323,14 +323,17 @@ void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event)
         {
             if(ListPOD[i].Index == Index)
             {
-                ListPODevent[i] |= Event;
+                ListPODevent[i] |= evtReady;
                 break;
             }
         }
     }
 }
 
-
+void OD_Poll(void)
+{
+    
+}
 
 /*
 // Make Topic Name from record number

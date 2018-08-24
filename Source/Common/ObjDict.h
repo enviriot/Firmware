@@ -49,6 +49,12 @@ enum
     objLogE             = (uint16_t)0xFFE3  // Data logging, log level - Error
 }eObjList_t;
 
+enum
+{
+    evtReady            = 0x01,
+    evtSupress          = 0x80
+}eObjEnevts_t;
+
 
 // Variable description
 typedef struct
@@ -76,8 +82,8 @@ void OD_Init(void);
 
 e_MQTTSN_RETURNS_t OD_Read(uint16_t Id, uint8_t Flags, uint8_t *pLen, uint8_t *pBuf);
 e_MQTTSN_RETURNS_t OD_Write(uint16_t Id, uint8_t Flags, uint8_t Len, uint8_t *pBuf);
-void OD_SetEvent(uint16_t Index, uint8_t Flags, uint8_t Event);
-
+void OD_SetEventReady(uint16_t Index, uint8_t Flags);
+void OD_Poll(void);
 
 /*
 uint8_t OD_MakeTopicName(uint8_t RecNR, uint8_t *pBuf);
